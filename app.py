@@ -17,6 +17,7 @@ headers = {
 def home():
     return "Bot Telegram Actif ⚽🔥"
 
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
@@ -37,7 +38,10 @@ def webhook():
 
 def analyse_match(text):
     try:
-        teams = text.split("vs")
+        if "vs" not in text.lower():
+            return "❌ Format invalide.\nUtilise : Equipe1 vs Equipe2"
+
+        teams = text.lower().split("vs")
         team1 = teams[0].strip()
         team2 = teams[1].strip()
 
@@ -47,22 +51,20 @@ def analyse_match(text):
         if not id1 or not id2:
             return "❌ Équipe introuvable."
 
-        stats1 = get_last_matches(id1)
-        stats2 = get_last_matches(id2)
+        avg1 = get_last_matches(id1)
+        avg2 = get_last_matches(id2)
 
-        prediction = generate_prediction(stats1, stats2, team1, team2)
+        return generate_prediction(avg1, avg2, team1.title(), team2.title())
 
-        return prediction
-
-    except:
-        return "❌ Format invalide. Utilise : Equipe1 vs Equipe2"
+    except Exception as e:
+        return f"❌ Erreur : {str(e)}"
 
 
 def get_team_id(team_name):
     url = f"https://v3.football.api-sports.io/teams?search={team_name}"
     response = requests.get(url, headers=headers).json()
 
-    if response["results"] == 0:
+    if response.get("results", 0) == 0:
         return None
 
     return response["response"][0]["team"]["id"]
@@ -72,15 +74,19 @@ def get_last_matches(team_id):
     url = f"https://v3.football.api-sports.io/fixtures?team={team_id}&last=5"
     response = requests.get(url, headers=headers).json()
 
-    matches = response["response"]
+    matches = response.get("response", [])
+
+    if not matches:
+        return 0
 
     total_goals = 0
 
     for match in matches:
-        goals = match["goals"]["for"]
-        total_goals += goals
+        home = match["goals"]["home"] or 0
+        away = match["goals"]["away"] or 0
+        total_goals += home + away
 
-    avg_goals = total_goals / 5
+    avg_goals = total_goals / len(matches)
 
     return avg_goals
 
