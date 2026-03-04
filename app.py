@@ -1,60 +1,35 @@
-from flask import Flask, request, jsonify
-import requests
 import os
+import requests
+from flask import Flask, request
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("API_KEY")
-
-headers = {
-    "X-RapidAPI-Key": API_KEY,
-    "X-RapidAPI-Host": "api-football-v1.p.rapidapi.com"
-}
+TOKEN = os.environ.get("BOT_TOKEN")
+TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
 @app.route("/")
 def home():
-    return "Football Bot PRO actif ⚽🔥"
+    return "Bot is running!"
 
-@app.route("/analyse", methods=["GET"])
-def analyse_match():
-    home_id = request.args.get("home")
-    away_id = request.args.get("away")
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.get_json()
 
-    if not home_id or not away_id:
-        return jsonify({"error": "home et away requis"}), 400
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
 
-    url = "https://api-football-v1.p.rapidapi.com/v3/fixtures"
+        if text == "/start":
+            reply = "Bienvenue sur Football Bot Pro ⚽🔥"
+        else:
+            reply = "Message reçu ✅"
 
-    params = {
-        "team": home_id,
-        "next": 10
-    }
+        requests.post(TELEGRAM_URL, json={
+            "chat_id": chat_id,
+            "text": reply
+        })
 
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
-
-    if "response" not in data:
-        return jsonify({"error": "Erreur API"}), 500
-
-    for match in data["response"]:
-        if str(match["teams"]["away"]["id"]) == away_id:
-            home_team = match["teams"]["home"]["name"]
-            away_team = match["teams"]["away"]["name"]
-            date = match["fixture"]["date"]
-
-            return jsonify({
-                "match": f"{home_team} vs {away_team}",
-                "date": date,
-                "prediction": {
-                    "score": "2-1",
-                    "over_2_5": "Oui",
-                    "btts": "Oui"
-                }
-            })
-
-    return jsonify({"message": "Pas de match programmé entre ces équipes"}), 404
-
+    return "OK"
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
