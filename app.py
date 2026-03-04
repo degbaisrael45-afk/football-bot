@@ -13,6 +13,7 @@ headers = {
     "x-apisports-key": API_KEY
 }
 
+
 @app.route("/")
 def home():
     return "Bot Telegram Actif ⚽🔥"
@@ -41,7 +42,7 @@ def analyse_match(text):
         if "vs" not in text.lower():
             return "❌ Format invalide.\nUtilise : Equipe1 vs Equipe2"
 
-        teams = text.lower().split("vs")
+        teams = text.split("vs")
         team1 = teams[0].strip()
         team2 = teams[1].strip()
 
@@ -54,27 +55,41 @@ def analyse_match(text):
         avg1 = get_last_matches(id1)
         avg2 = get_last_matches(id2)
 
-        return generate_prediction(avg1, avg2, team1.title(), team2.title())
+        return generate_prediction(avg1, avg2, team1, team2)
 
     except Exception as e:
         return f"❌ Erreur : {str(e)}"
 
 
+# 🔥 FONCTION CORRIGÉE
 def get_team_id(team_name):
-    url = f"https://v3.football.api-sports.io/teams?search={team_name}"
-    response = requests.get(url, headers=headers).json()
+    url = "https://v3.football.api-sports.io/teams"
 
-    if response.get("results", 0) == 0:
+    params = {
+        "search": team_name
+    }
+
+    response = requests.get(url, headers=headers, params=params)
+    data = response.json()
+
+    if data.get("results", 0) == 0:
         return None
 
-    return response["response"][0]["team"]["id"]
+    return data["response"][0]["team"]["id"]
 
 
 def get_last_matches(team_id):
-    url = f"https://v3.football.api-sports.io/fixtures?team={team_id}&last=5"
-    response = requests.get(url, headers=headers).json()
+    url = "https://v3.football.api-sports.io/fixtures"
 
-    matches = response.get("response", [])
+    params = {
+        "team": team_id,
+        "last": 5
+    }
+
+    response = requests.get(url, headers=headers, params=params)
+    data = response.json()
+
+    matches = data.get("response", [])
 
     if not matches:
         return 0
