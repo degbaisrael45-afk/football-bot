@@ -44,7 +44,7 @@ def get_stats(team_id):
         params={
             "team": team_id,
             "league": 61,
-            "season": 2023
+            "season": 2024
         }
     )
 
@@ -70,28 +70,28 @@ def analyse(update: Update, context: CallbackContext):
         stats1 = get_stats(id1)
         stats2 = get_stats(id2)
 
-        goals1 = stats1["goals"]["for"]["average"]["total"]
-        goals2 = stats2["goals"]["for"]["average"]["total"]
+        goals1 = float(stats1["goals"]["for"]["average"]["total"])
+        goals2 = float(stats2["goals"]["for"]["average"]["total"])
 
-        conceded1 = stats1["goals"]["against"]["average"]["total"]
-        conceded2 = stats2["goals"]["against"]["average"]["total"]
+        conceded1 = float(stats1["goals"]["against"]["average"]["total"])
+        conceded2 = float(stats2["goals"]["against"]["average"]["total"])
 
-        avg_total = float(goals1) + float(goals2)
+        avg_total = goals1 + goals2
 
         if avg_total > 2.5:
             over = "Oui"
         else:
             over = "Non"
 
-        if float(goals1) > float(goals2):
+        if goals1 > goals2:
             favori = team1
-        elif float(goals2) > float(goals1):
+        elif goals2 > goals1:
             favori = team2
         else:
             favori = "Match équilibré"
 
-        score1 = round((float(goals1)+float(conceded2))/2)
-        score2 = round((float(goals2)+float(conceded1))/2)
+        score1 = round((goals1 + conceded2) / 2)
+        score2 = round((goals2 + conceded1) / 2)
 
         message = f"""
 🤖 Analyse IA réelle
@@ -120,7 +120,7 @@ def analyse(update: Update, context: CallbackContext):
 
 def main():
 
-    updater = Updater(TOKEN, use_context=True)
+    updater = Updater(TOKEN)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
