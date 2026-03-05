@@ -2,7 +2,7 @@ import requests
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
-TOKEN = "TON_TOKEN_TELEGRAM"
+TOKEN = "8254455597:AAGoKJ74A5IlnHa31nVO_MWv-fM2x_Q-WfI"
 
 def start(update: Update, context: CallbackContext):
     update.message.reply_text(
