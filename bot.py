@@ -47,14 +47,17 @@ def match(update, context):
     goals2 = s2["response"]["goals"]["for"]["total"]["total"]
 
     if goals1 > goals2:
-        pronostic = f"{team1} favori"
-        score = "2-1"
-    elif goals2 > goals1:
-        pronostic = f"{team2} favori"
-        score = "1-2"
-    else:
-        pronostic = "Match équilibré"
-        score = "1-1"
+    pronostic = f"{team1} favori"
+    score = "2-1"
+    over = "Oui"
+elif goals2 > goals1:
+    pronostic = f"{team2} favori"
+    score = "1-2"
+    over = "Oui"
+else:
+    pronostic = "Match équilibré"
+    score = "1-1"
+    over = "Non"
 
     message = f"""
 ⚽ Analyse IA
@@ -63,10 +66,10 @@ def match(update, context):
 
 Pronostic :
 🏆 {pronostic}
-📊 +2.5 buts possible
+📊 Over 2.5 : {over}
 🎯 Score probable : {score}
 """
-
+    
     update.message.reply_text(message)
 
 def main():
