@@ -1,8 +1,9 @@
-import requests
+import os
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
-TOKEN = "8254455597:AAGoKJ74A5IlnHa31nVO_MWv-fM2x_Q-WfI"
+TOKEN = os.getenv("BOT_TOKEN")
+
 
 def start(update: Update, context: CallbackContext):
     update.message.reply_text(
@@ -12,6 +13,7 @@ def start(update: Update, context: CallbackContext):
         "/analyse equipe1 equipe2\n"
         "/score equipe1 equipe2"
     )
+
 
 def match(update: Update, context: CallbackContext):
     try:
@@ -32,6 +34,7 @@ def match(update: Update, context: CallbackContext):
 
     except:
         update.message.reply_text("Utilisation : /match equipe1 equipe2")
+
 
 def analyse(update: Update, context: CallbackContext):
     try:
@@ -54,6 +57,7 @@ def analyse(update: Update, context: CallbackContext):
     except:
         update.message.reply_text("Utilisation : /analyse equipe1 equipe2")
 
+
 def score(update: Update, context: CallbackContext):
     try:
         team1 = context.args[0]
@@ -73,6 +77,7 @@ def score(update: Update, context: CallbackContext):
     except:
         update.message.reply_text("Utilisation : /score equipe1 equipe2")
 
+
 def main():
     updater = Updater(TOKEN)
     dp = updater.dispatcher
@@ -84,6 +89,7 @@ def main():
 
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == "__main__":
     main()
