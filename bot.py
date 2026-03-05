@@ -2,113 +2,114 @@ import requests
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
-# TOKEN TELEGRAM
 TOKEN = "8254455597:AAGoKJ74A5IlnHa31nVO_MWv-fM2x_Q-WfI"
-
-# API FOOTBALL
 API_KEY = "c777b294355a4fadb9110ced12646899"
+
+url = "https://v3.football.api-sports.io"
 
 headers = {
     "x-apisports-key": API_KEY
 }
 
-# ---------------- START ----------------
-
 def start(update: Update, context: CallbackContext):
     update.message.reply_text(
-        "⚽ FOOTBALL BOT PRO V2 ACTIF\n\n"
-        "Commandes :\n"
-        "/analyse equipe1 equipe2\n"
-        "/match equipe1 equipe2"
+        "🤖 FOOTBALL BOT PRO V3\n\n"
+        "Commande :\n"
+        "/analyse equipe1 equipe2\n\n"
+        "Exemple :\n"
+        "/analyse lyon lens"
     )
 
-# -------- TROUVER ID EQUIPE --------
+def get_team_id(team):
 
-def get_team_id(team_name):
+    r = requests.get(
+        url + "/teams",
+        headers=headers,
+        params={"search": team}
+    )
 
-    url = "https://v3.football.api-sports.io/teams"
-
-    params = {
-        "search": team_name
-    }
-
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
+    data = r.json()
 
     if data["results"] == 0:
         return None
 
     return data["response"][0]["team"]["id"]
 
-# -------- STATISTIQUES --------
 
 def get_stats(team_id):
 
-    url = "https://v3.football.api-sports.io/fixtures"
+    r = requests.get(
+        url + "/teams/statistics",
+        headers=headers,
+        params={
+            "team": team_id,
+            "league": 61,
+            "season": 2023
+        }
+    )
 
-    params = {
-        "team": team_id,
-        "last": 5
-    }
+    data = r.json()
 
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
+    return data["response"]
 
-    goals = 0
-
-    for match in data["response"]:
-        goals += match["goals"]["for"]["total"] if "for" in match["goals"] else 0
-
-    return goals
-
-# -------- ANALYSE --------
 
 def analyse(update: Update, context: CallbackContext):
 
     try:
+
         team1 = context.args[0]
         team2 = context.args[1]
 
         id1 = get_team_id(team1)
         id2 = get_team_id(team2)
 
-        if not id1 or not id2:
-            update.message.reply_text("❌ Equipe introuvable")
+        if id1 is None or id2 is None:
+            update.message.reply_text("❌ Équipe introuvable")
             return
 
-        goals1 = get_stats(id1)
-        goals2 = get_stats(id2)
+        stats1 = get_stats(id1)
+        stats2 = get_stats(id2)
 
-        total = goals1 + goals2
+        goals1 = stats1["goals"]["for"]["average"]["total"]
+        goals2 = stats2["goals"]["for"]["average"]["total"]
 
-        if goals1 > goals2:
-            favori = team1
-        elif goals2 > goals1:
-            favori = team2
-        else:
-            favori = "Match équilibré"
+        conceded1 = stats1["goals"]["against"]["average"]["total"]
+        conceded2 = stats2["goals"]["against"]["average"]["total"]
 
-        if total >= 10:
+        avg_total = float(goals1) + float(goals2)
+
+        if avg_total > 2.5:
             over = "Oui"
         else:
             over = "Non"
 
-        score = "2-1"
+        if float(goals1) > float(goals2):
+            favori = team1
+        elif float(goals2) > float(goals1):
+            favori = team2
+        else:
+            favori = "Match équilibré"
+
+        score1 = round((float(goals1)+float(conceded2))/2)
+        score2 = round((float(goals2)+float(conceded1))/2)
 
         message = f"""
-🤖 Analyse IA
+🤖 Analyse IA réelle
 
-{team1} vs {team2}
+⚽ {team1} vs {team2}
 
-📊 Buts 5 derniers matchs
-{team1} : {goals1}
-{team2} : {goals2}
+📊 Moyenne buts {team1} : {goals1}
+📊 Moyenne buts {team2} : {goals2}
+
+📉 Défense {team1} : {conceded1}
+📉 Défense {team2} : {conceded2}
 
 🏆 Favori : {favori}
 
 📈 Over 2.5 : {over}
 
-🎯 Score probable : {score}
+🎯 Score probable :
+{score1} - {score2}
 """
 
         update.message.reply_text(message)
@@ -116,45 +117,16 @@ def analyse(update: Update, context: CallbackContext):
     except:
         update.message.reply_text("Utilisation : /analyse equipe1 equipe2")
 
-# -------- MATCH --------
-
-def match(update: Update, context: CallbackContext):
-
-    try:
-        team1 = context.args[0]
-        team2 = context.args[1]
-
-        message = f"""
-⚽ Analyse rapide
-
-{team1} vs {team2}
-
-📊 Pronostic IA
-
-• Les deux équipes marquent
-• Over 2.5 probable
-• Score probable : 2-1
-"""
-
-        update.message.reply_text(message)
-
-    except:
-        update.message.reply_text("Utilisation : /match equipe1 equipe2")
-
-# -------- MAIN --------
 
 def main():
 
     updater = Updater(TOKEN, use_context=True)
-
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("analyse", analyse))
-    dp.add_handler(CommandHandler("match", match))
 
     updater.start_polling()
-
     updater.idle()
 
 
