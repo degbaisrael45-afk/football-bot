@@ -1,95 +1,83 @@
-import os
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+import requests
+from telegram.ext import Updater, CommandHandler
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = "8254455597:AAGoKJ74A5IlnHa31nVO_MWv-fM2x_Q-WfI"
+API_KEY = "c777b294355a4fadb9110ced12646899"
 
-
-def start(update: Update, context: CallbackContext):
+def start(update, context):
     update.message.reply_text(
-        "🤖 FOOTBALL BOT PRO ACTIF\n\n"
-        "Commandes disponibles :\n"
-        "/match equipe1 equipe2\n"
-        "/analyse equipe1 equipe2\n"
-        "/score equipe1 equipe2"
+        "⚽ Football Bot PRO actif\n\nCommande:\n/match equipe1 equipe2"
     )
 
+def match(update, context):
 
-def match(update: Update, context: CallbackContext):
-    try:
-        team1 = context.args[0]
-        team2 = context.args[1]
+    if len(context.args) < 2:
+        update.message.reply_text("Utilise: /match equipe1 equipe2")
+        return
 
-        message = (
-            f"⚽ Analyse du match\n\n"
-            f"{team1} vs {team2}\n\n"
-            "📊 Pronostic IA :\n"
-            "• +2.5 buts probable\n"
-            "• Les deux équipes marquent\n"
-            "• Match offensif\n"
-            "• Fiabilité : 78%"
-        )
+    team1 = context.args[0]
+    team2 = context.args[1]
 
-        update.message.reply_text(message)
+    url = "https://v3.football.api-sports.io/teams"
+    headers = {
+        "x-apisports-key": API_KEY
+    }
 
-    except:
-        update.message.reply_text("Utilisation : /match equipe1 equipe2")
+    r1 = requests.get(url, headers=headers, params={"search": team1})
+    r2 = requests.get(url, headers=headers, params={"search": team2})
 
+    data1 = r1.json()
+    data2 = r2.json()
 
-def analyse(update: Update, context: CallbackContext):
-    try:
-        team1 = context.args[0]
-        team2 = context.args[1]
+    if not data1["response"] or not data2["response"]:
+        update.message.reply_text("Équipe introuvable")
+        return
 
-        message = (
-            f"🤖 Analyse avancée\n\n"
-            f"{team1} vs {team2}\n\n"
-            "📊 Statistiques IA\n"
-            "• Possession équilibrée\n"
-            "• Attaque active\n"
-            "• Défense moyenne\n\n"
-            "⚠️ Risque FIFA truqué : 32%\n"
-            "✅ Match assez fiable"
-        )
+    team1_id = data1["response"][0]["team"]["id"]
+    team2_id = data2["response"][0]["team"]["id"]
 
-        update.message.reply_text(message)
+    update.message.reply_text(f"🔎 Analyse de {team1} vs {team2}...")
 
-    except:
-        update.message.reply_text("Utilisation : /analyse equipe1 equipe2")
+    stats_url = "https://v3.football.api-sports.io/teams/statistics"
 
+    s1 = requests.get(stats_url, headers=headers, params={"team": team1_id, "league": 39, "season": 2023}).json()
+    s2 = requests.get(stats_url, headers=headers, params={"team": team2_id, "league": 39, "season": 2023}).json()
 
-def score(update: Update, context: CallbackContext):
-    try:
-        team1 = context.args[0]
-        team2 = context.args[1]
+    goals1 = s1["response"]["goals"]["for"]["total"]["total"]
+    goals2 = s2["response"]["goals"]["for"]["total"]["total"]
 
-        message = (
-            f"⚽ Score probable\n\n"
-            f"{team1} vs {team2}\n\n"
-            "🔮 Prédiction IA\n"
-            "Score probable : 2-1\n"
-            "Alternative : 1-1\n"
-            "Over 2.5 : Oui"
-        )
+    if goals1 > goals2:
+        pronostic = f"{team1} favori"
+        score = "2-1"
+    elif goals2 > goals1:
+        pronostic = f"{team2} favori"
+        score = "1-2"
+    else:
+        pronostic = "Match équilibré"
+        score = "1-1"
 
-        update.message.reply_text(message)
+    message = f"""
+⚽ Analyse IA
 
-    except:
-        update.message.reply_text("Utilisation : /score equipe1 equipe2")
+{team1} vs {team2}
 
+Pronostic :
+🏆 {pronostic}
+📊 +2.5 buts possible
+🎯 Score probable : {score}
+"""
+
+    update.message.reply_text(message)
 
 def main():
-    updater = Updater(TOKEN)
+    updater = Updater(TOKEN, use_context=True)
+
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("match", match))
-    dp.add_handler(CommandHandler("analyse", analyse))
-    dp.add_handler(CommandHandler("score", score))
 
     updater.start_polling()
     updater.idle()
 
-
-if __name__ == "__main__":
-    main()
+main()
