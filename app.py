@@ -1,112 +1,130 @@
 import os
-import requests
+import random
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-API_KEY = os.getenv("API_KEY")
 
-headers = {"X-Auth-Token": API_KEY}
+def analyse_match(home, away, home_odds, draw_odds, away_odds, btts_odds, over25_odds):
 
-# START
+    home_odds = float(home_odds)
+    draw_odds = float(draw_odds)
+    away_odds = float(away_odds)
+    btts_odds = float(btts_odds)
+    over25_odds = float(over25_odds)
+
+    suspicion = 0
+
+    if over25_odds < 1.70:
+        suspicion += 40
+
+    if btts_odds < 1.70:
+        suspicion += 40
+
+    if abs(home_odds - away_odds) < 0.50:
+        suspicion += 20
+
+    if suspicion >= 70:
+        statut = "⚠️ MATCH POSSIBLEMENT SIMULÉ (TYPE FIFA)"
+    else:
+        statut = "Match probablement normal"
+
+    # Probabilité victoire basée sur les cotes
+    prob_home = round((1/home_odds)*100, 1)
+    prob_away = round((1/away_odds)*100, 1)
+
+    # Scores probables
+    scores = ["1-1","2-1","2-2","3-2","3-1","3-3","4-2"]
+    score_exact = random.choice(scores)
+
+    # Analyse BTTS
+    if btts_odds < 1.80:
+        btts_result = "BTTS : OUI probable"
+    else:
+        btts_result = "BTTS : NON possible"
+
+    # Analyse Over
+    if over25_odds < 1.80:
+        over_result = "Plus de 2.5 buts probable"
+    else:
+        over_result = "Moins de 2.5 buts possible"
+
+    resultat = f"""
+⚽ ANALYSE IA DU MATCH
+
+Match : {home} vs {away}
+
+{statut}
+
+📊 Probabilité victoire
+{home} : {prob_home}%
+{away} : {prob_away}%
+
+{btts_result}
+{over_result}
+
+🎯 Score probable : {score_exact}
+"""
+
+    return resultat
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     message = (
-        "⚽ FOOTBALL BOT PRO 1000X\n\n"
-        "Commandes :\n"
-        "/analyse equipe1 equipe2 cote1 coteX cote2 btts over25\n\n"
+        "🤖 BOT PRONOSTIC FOOTBALL IA\n\n"
+        "Envoie les informations du match comme ceci :\n\n"
+        "Equipe1 Equipe2\n"
+        "Cote victoire equipe1\n"
+        "Cote match nul\n"
+        "Cote victoire equipe2\n"
+        "Cote BTTS\n"
+        "Cote Over2.5\n\n"
         "Exemple :\n"
-        "/analyse Arsenal Chelsea 1.90 3.40 3.80 1.70 1.65"
+        "Arsenal Chelsea\n"
+        "1.90\n"
+        "3.40\n"
+        "3.80\n"
+        "1.65\n"
+        "1.70"
     )
 
     await update.message.reply_text(message)
 
 
-# ANALYSE MATCH
 async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
+        data = update.message.text.split("\n")
 
-        equipe1 = context.args[0]
-        equipe2 = context.args[1]
+        equipes = data[0].split()
 
-        cote1 = float(context.args[2])
-        coteX = float(context.args[3])
-        cote2 = float(context.args[4])
-        btts = float(context.args[5])
-        over25 = float(context.args[6])
+        home = equipes[0]
+        away = equipes[1]
 
-        message = f"⚽ Analyse IA\n\n{equipe1} vs {equipe2}\n\n"
+        home_odds = data[1]
+        draw_odds = data[2]
+        away_odds = data[3]
+        btts_odds = data[4]
+        over25_odds = data[5]
 
-        # FAVORI
-        if cote1 < cote2:
-            favori = equipe1
-        else:
-            favori = equipe2
+        resultat = analyse_match(home, away, home_odds, draw_odds, away_odds, btts_odds, over25_odds)
 
-        message += f"🏆 Favori : {favori}\n"
-
-        # Probabilité victoire
-        prob1 = round((1 / cote1) * 100, 1)
-        prob2 = round((1 / cote2) * 100, 1)
-
-        message += f"\n📊 Probabilité victoire\n"
-        message += f"{equipe1} : {prob1}%\n"
-        message += f"{equipe2} : {prob2}%\n"
-
-        # OVER / UNDER
-        if over25 < 1.80:
-            message += "\n🔥 Over 2.5 très probable"
-            score = "2-1 ou 3-1"
-        else:
-            message += "\n❄️ Under 2.5 probable"
-            score = "1-0 ou 1-1"
-
-        # BTTS
-        if btts < 1.80:
-            message += "\n⚽ BTTS : OUI"
-        else:
-            message += "\n⚽ BTTS : NON"
-
-        message += f"\n\n🎯 Score probable : {score}"
-
-        await update.message.reply_text(message)
+        await update.message.reply_text(resultat)
 
     except:
-
-        await update.message.reply_text(
-            "❌ Mauvaise commande\n\n"
-            "Exemple :\n"
-            "/analyse Arsenal Chelsea 1.90 3.40 3.80 1.70 1.65"
-        )
+        await update.message.reply_text("❌ Format incorrect. Tape /start pour voir le format.")
 
 
-# MATCH DU JOUR
-async def matchs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    url = "https://api.football-data.org/v4/matches"
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyse))
 
-    response = requests.get(url, headers=headers)
-    data = response.json()
+    print("Bot démarré...")
 
-    message = "📅 Matchs du jour\n\n"
-
-    for match in data["matches"][:10]:
-
-        home = match["homeTeam"]["name"]
-        away = match["awayTeam"]["name"]
-
-        message += f"{home} vs {away}\n"
-
-    await update.message.reply_text(message)
+    app.run_polling()
 
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("analyse", analyse))
-app.add_handler(CommandHandler("matchs", matchs))
-
-print("Bot PRO 1000X lancé")
-
-app.run_polling()
+if __name__ == "__main__":
+    main()
