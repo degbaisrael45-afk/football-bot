@@ -1,7 +1,7 @@
 import telegram
 from telegram.ext import Updater, CommandHandler
 
-TOKEN = "TON_TOKEN_TELEGRAM"
+TOKEN = "8254455597:AAGoKJ74A5IlnHa31nVO_MWv-fM2x_Q-WfI"
 
 def start(update, context):
     update.message.reply_text("🤖 Bot Football PRO actif !")
