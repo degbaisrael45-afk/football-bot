@@ -1,132 +1,112 @@
-from flask import Flask, request
-import requests
 import os
-import math
+import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-app = Flask(__name__)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+API_KEY = os.getenv("API_KEY")
 
-TOKEN = os.getenv("BOT_TOKEN")
-API_KEY = os.getenv("FOOTBALL_API_KEY")
-TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}"
+headers = {"X-Auth-Token": API_KEY}
 
-# ----------- TELEGRAM -----------
+# START
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-def send_message(chat_id, text):
-    url = f"{TELEGRAM_URL}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": text})
+    message = (
+        "⚽ FOOTBALL BOT PRO 1000X\n\n"
+        "Commandes :\n"
+        "/analyse equipe1 equipe2 cote1 coteX cote2 btts over25\n\n"
+        "Exemple :\n"
+        "/analyse Arsenal Chelsea 1.90 3.40 3.80 1.70 1.65"
+    )
 
-# ----------- FOOTBALL DATA -----------
+    await update.message.reply_text(message)
 
-def get_last_matches(team_name):
-    headers = {"X-Auth-Token": API_KEY}
-    teams_url = "https://api.football-data.org/v4/teams"
-    r = requests.get(teams_url, headers=headers)
-    teams = r.json()["teams"]
 
-    team_id = None
-    for team in teams:
-        if team_name.lower() in team["name"].lower():
-            team_id = team["id"]
-            break
+# ANALYSE MATCH
+async def analyse(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if not team_id:
-        return None
+    try:
 
-    matches_url = f"https://api.football-data.org/v4/teams/{team_id}/matches?limit=5"
-    r = requests.get(matches_url, headers=headers)
-    matches = r.json()["matches"]
+        equipe1 = context.args[0]
+        equipe2 = context.args[1]
 
-    goals_scored = 0
-    goals_conceded = 0
+        cote1 = float(context.args[2])
+        coteX = float(context.args[3])
+        cote2 = float(context.args[4])
+        btts = float(context.args[5])
+        over25 = float(context.args[6])
 
-    for m in matches:
-        if m["homeTeam"]["id"] == team_id:
-            goals_scored += m["score"]["fullTime"]["home"] or 0
-            goals_conceded += m["score"]["fullTime"]["away"] or 0
+        message = f"⚽ Analyse IA\n\n{equipe1} vs {equipe2}\n\n"
+
+        # FAVORI
+        if cote1 < cote2:
+            favori = equipe1
         else:
-            goals_scored += m["score"]["fullTime"]["away"] or 0
-            goals_conceded += m["score"]["fullTime"]["home"] or 0
+            favori = equipe2
 
-    return goals_scored/5, goals_conceded/5
+        message += f"🏆 Favori : {favori}\n"
 
-# ----------- CALCULS -----------
+        # Probabilité victoire
+        prob1 = round((1 / cote1) * 100, 1)
+        prob2 = round((1 / cote2) * 100, 1)
 
-def implied_prob(odd):
-    return 1 / odd
+        message += f"\n📊 Probabilité victoire\n"
+        message += f"{equipe1} : {prob1}%\n"
+        message += f"{equipe2} : {prob2}%\n"
 
-def poisson(lmbda, k):
-    return (math.exp(-lmbda) * lmbda**k) / math.factorial(k)
+        # OVER / UNDER
+        if over25 < 1.80:
+            message += "\n🔥 Over 2.5 très probable"
+            score = "2-1 ou 3-1"
+        else:
+            message += "\n❄️ Under 2.5 probable"
+            score = "1-0 ou 1-1"
 
-# ----------- WEBHOOK -----------
+        # BTTS
+        if btts < 1.80:
+            message += "\n⚽ BTTS : OUI"
+        else:
+            message += "\n⚽ BTTS : NON"
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.get_json()
+        message += f"\n\n🎯 Score probable : {score}"
 
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
+        await update.message.reply_text(message)
 
-        if "vs" in text:
-            lines = text.split("\n")
-            match_line = lines[0]
-            home, away = match_line.split("vs")
-            home = home.strip()
-            away = away.strip()
+    except:
 
-            try:
-                odd1 = float(lines[1].split(":")[1])
-                oddX = float(lines[2].split(":")[1])
-                odd2 = float(lines[3].split(":")[1])
-                oddBTTS = float(lines[4].split(":")[1])
-                oddOver = float(lines[6].split(":")[1])
-            except:
-                send_message(chat_id, "Format incorrect.")
-                return "ok"
+        await update.message.reply_text(
+            "❌ Mauvaise commande\n\n"
+            "Exemple :\n"
+            "/analyse Arsenal Chelsea 1.90 3.40 3.80 1.70 1.65"
+        )
 
-            home_avg = get_last_matches(home)
-            away_avg = get_last_matches(away)
 
-            if not home_avg or not away_avg:
-                send_message(chat_id, "Équipe introuvable.")
-                return "ok"
+# MATCH DU JOUR
+async def matchs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-            home_attack = home_avg[0]
-            away_attack = away_avg[0]
+    url = "https://api.football-data.org/v4/matches"
 
-            # Probabilités Poisson
-            p_home_2 = poisson(home_attack, 2)
-            p_away_1 = poisson(away_attack, 1)
+    response = requests.get(url, headers=headers)
+    data = response.json()
 
-            score1 = "2-1"
-            score2 = "1-1"
+    message = "📅 Matchs du jour\n\n"
 
-            value_home = (home_attack/ (home_attack+away_attack)) - implied_prob(odd1)
+    for match in data["matches"][:10]:
 
-            reply = f"""
-Analyse IA 🔥
+        home = match["homeTeam"]["name"]
+        away = match["awayTeam"]["name"]
 
-{home} Moy buts: {round(home_attack,2)}
-{away} Moy buts: {round(away_attack,2)}
+        message += f"{home} vs {away}\n"
 
-Prob implicite 1: {round(implied_prob(odd1)*100,1)}%
-Value Home: {round(value_home*100,1)}%
+    await update.message.reply_text(message)
 
-Scores probables:
-1️⃣ {score1}
-2️⃣ {score2}
-"""
 
-            send_message(chat_id, reply)
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-        elif text == "/start":
-            send_message(chat_id, "Football Bot Intelligent ⚽🔥\nEnvoie match + cotes.")
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("analyse", analyse))
+app.add_handler(CommandHandler("matchs", matchs))
 
-    return "ok"
+print("Bot PRO 1000X lancé")
 
-@app.route("/")
-def home():
-    return "Bot Intelligent Actif ⚽🔥"
-
-if __name__ == "__main__":
-    app.run()
+app.run_polling()
